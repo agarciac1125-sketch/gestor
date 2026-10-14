@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GESTOR REGIONAL EJE CAFETERO</title>
+  <!-- Bootstrap 5 CSS & FontAwesome -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Librerías para Exportar Excel y PDF -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  
+  <style>
+    body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .header-bg { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: white; padding: 20px 0; }
+    .card-kpi { border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .badge-cumple { background-color: #198754; color: white; }
+    .badge-nocumple { background-color: #dc3545; color: white; }
+    .badge-encurso { background-color: #0dcaf0; color: #212529; }
+    .table-hover tbody tr:hover { background-color: #f1f5f9; }
+    .modal-header { background-color: #203a43; color: white; }
+  </style>
+</head>
+<body>
+
+  <!-- Encabezado -->
+  <div class="header-bg shadow-sm mb-4">
+    <div class="container">
+      <div class="d-flex justify-content-between align-items-center flex-wrap">
+        <div>
+          <h2 class="fw-bold mb-1"><i class="fa-solid fa-list-check me-2"></i>GESTOR REGIONAL EJE CAFETERO</h2>
+          <p class="mb-0 text-light opacity-75" id="lblModoConexion">Control Operativo, Seguimientos e Indicadores</p>
+        </div>
+        <div class="mt-3 mt-md-0 d-flex gap-2">
+          <button class="btn btn-outline-light btn-sm" onclick="exportarExcel()"><i class="fa-solid fa-file-excel me-1"></i> Excel General</button>
+          <button class="btn btn-outline-light btn-sm" onclick="exportarPDF()"><i class="fa-solid fa-file-pdf me-1"></i> PDF General</button>
+          <button class="btn btn-success btn-sm fw-bold" onclick="abrirModalNuevaTarea()"><i class="fa-solid fa-plus me-1"></i> Nueva Tarea</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container mb-5">
+    <!-- Panel de Indicadores General -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card card-kpi p-3 bg-white text-center">
+          <span class="text-muted small fw-bold">TOTAL TAREAS</span>
+          <h3 class="fw-bold mb-0 text-dark" id="kpiTotal">0</h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-kpi p-3 bg-white text-center">
+          <span class="text-muted small fw-bold">TAREAS CERRADAS</span>
+          <h3 class="fw-bold mb-0 text-primary" id="kpiCerradas">0</h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-kpi p-3 bg-white text-center">
+          <span class="text-muted small fw-bold">CUMPLIMIENTO GENERAL</span>
+          <h3 class="fw-bold mb-0 text-success" id="kpiCumplimiento">0%</h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card card-kpi p-3 bg-white text-center">
+          <span class="text-muted small fw-bold">EN CURSO</span>
+          <h3 class="fw-bold mb-0 text-info" id="kpiEnCurso">0</h3>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gestión de Equipo e Indicadores por Integrante -->
+    <div class="card card-kpi bg-white p-3 mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="fw-bold mb-0 text-secondary"><i class="fa-solid fa-users me-2"></i>Cumplimiento por Integrante del Equipo</h6>
+        <button class="btn btn-sm btn-outline-primary" onclick="abrirModalEquipo()"><i class="fa-solid fa-user-plus me-1"></i> Administrar Equipo</button>
+      </div>
+      <div class="row g-2" id="contenedorEquipoKPI"></div>
+    </div>
+
+    <!-- Tabla Principal de Tareas -->
+    <div class="card card-kpi bg-white p-3">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="tablaTareas">
+          <thead class="table-light">
+            <tr>
+              <th>Tarea</th>
+              <th>Responsable</th>
+              <th>Creación</th>
+              <th>Vencimiento</th>
+              <th>Estado / Cierre</th>
+              <th>Días Restantes/Atraso</th>
+              <th>Cumplimiento</th>
+              <th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyTareas"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Nueva Tarea -->
+  <div class="modal fade" id="modalNuevaTarea" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Crear Nueva Tarea</h5>
+          <button type="button" class="btn-close btn-close-white" onclick="cerrarModal('modalNuevaTarea')"></button>
+        </div>
+        <div class="modal-body">
+          <form id="formNuevaTarea">
+            <div class="mb-3">
+              <label class="form-label fw-bold">Título de la Tarea</label>
+              <input type="text" id="tituloTarea" class="form-control" required placeholder="Ej: Reporte de distribución zona norte">
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">Descripción Detallada</label>
+              <textarea id="descripcionTarea" class="form-control" rows="3" placeholder="Describa el objetivo o alcance de la tarea..."></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">Responsable</label>
+              <select id="selectResponsable" class="form-select" required></select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">Fecha de Vencimiento</label>
+              <input type="date" id="fechaVencimiento" class="form-control" required>
+              <div class="form-text text-danger">* Una vez guardada, la fecha de vencimiento NO se podrá modificar.</div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 fw-bold">Guardar Tarea</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cerrar Tarea -->
+  <div class="modal fade" id="modalCerrarTarea" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title fw-bold">Cierre de Tarea</h5>
+          <button type="button" class="btn-close btn-close-white" onclick="cerrarModal('modalCerrarTarea')"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="idTareaCierre">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Fecha de Cierre Efectiva</label>
+            <input type="date" id="fechaCierreReal" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold text-danger">Explicación / Conclusión de Cierre (Obligatoria) *</label>
+            <textarea id="conclusionCierre" class="form-control" rows="4" required placeholder="Detalle la solución o el motivo de finalización de la tarea..."></textarea>
+          </div>
+          <button type="button" class="btn btn-success w-100 fw-bold" onclick="guardarCierreTarea()">Confirmar Cierre</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Ver Detalle Completo Tarea -->
+  <div class="modal fade" id="modalVerDetalle" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="verTituloTarea">Detalle de la Tarea</h5>
+          <button type="button" class="btn-close btn-close-white" onclick="cerrarModal('modalVerDetalle')"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3 p-3 bg-light rounded border">
+            <h6 class="fw-bold text-secondary mb-1">Descripción Detallada:</h6>
+            <p class="mb-0 text-dark" id="verDescripcionText" style="white-space: pre-line;"></p>
+          </div>
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <p class="mb-1"><strong>Responsable:</strong> <span id="verResponsable"></span></p>
+              <p class="mb-1"><strong>Fecha Creación:</strong> <span id="verFechaCreacion"></span></p>
+              <p class="mb-1"><strong>Fecha Vencimiento:</strong> <span id="verFechaVencimiento"></span></p>
+            </div>
+            <div class="col-md-6">
+              <p class="mb-1"><strong>Estado:</strong> <span id="verEstado"></span></p>
+              <p class="mb-1"><strong>Días/Atraso:</strong> <span id="verDias"></span></p>
+              <p class="mb-1"><strong>Cumplimiento:</strong> <span id="verCumplimiento"></span></p>
+            </div>
+          </div>
+          <div id="verSeccionConclusion" class="alert alert-secondary d-none mb-3">
+            <h6 class="fw-bold mb-1">Conclusión de Cierre:</h6>
+            <p class="mb-0" id="verConclusionText"></p>
+          </div>
+          <hr>
+          <h6 class="fw-bold mb-2">Historial Completo de Seguimientos:</h6>
+          <div id="verListaSeguimientos" class="vstack gap-2 overflow-auto" style="max-height: 200px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Seguimientos / Historial -->
+  <div class="modal fade" id="modalSeguimiento" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Seguimientos de la Tarea</h5>
+          <button type="button" class="btn-close btn-close-white" onclick="cerrarModal('modalSeguimiento')"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="idTareaSeguimiento">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Añadir Nuevo Seguimiento / Avance</label>
+            <textarea id="textoSeguimiento" class="form-control mb-2" rows="2" placeholder="Escriba aquí los avances..."></textarea>
+            <button class="btn btn-primary btn-sm w-100" onclick="agregarSeguimiento()"><i class="fa-solid fa-plus me-1"></i> Registrar Seguimiento</button>
+          </div>
+          <hr>
+          <h6 class="fw-bold">Historial de Avances:</h6>
+          <div id="historialSeguimientos" class="vstack gap-2 overflow-auto" style="max-height: 250px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Administrar Equipo -->
+  <div class="modal fade" id="modalEquipo" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Equipo de Trabajo</h5>
+          <button type="button" class="btn-close btn-close-white" onclick="cerrarModal('modalEquipo')"></button>
+        </div>
+        <div class="modal-body">
+          <div class="input-group mb-3">
+            <input type="text" id="nuevoMiembro" class="form-control" placeholder="Nombre de nuevo integrante">
+            <button class="btn btn-outline-success" onclick="agregarMiembro()"><i class="fa-solid fa-plus"></i> Añadir</button>
+          </div>
+          <ul class="list-group" id="listaEquipo"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts JS de Bootstrap (Obligatorios para interactividad) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Lógica Principal -->
+  <script>
+    const enSharePoint = (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo && _spPageContextInfo.webAbsoluteUrl);
+    const NOMBRE_LISTA_SP = "GestorTareasEjeCafetero";
+
+    if (enSharePoint) {
+      document.getElementById('lblModoConexion').innerText = "Control Operativo - Sincronizado con SharePoint";
+    } else {
+      document.getElementById('lblModoConexion').innerText = "Control Operativo - Modo Local (PC)";
+    }
+
+    let equipo = JSON.parse(localStorage.getItem('equipo_eje_cafetero')) || [
+      "Alexander Garcia Castaño",
+      "Juan Alejandro Montoya Restrepo",
+      "Diego Francisco Cortes Sanchez",
+      "Luis Fernando Correa",
+      "Hernan Dario Velasquez Giraldo"
+    ];
+
+    let tareas = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      document.getElementById('fechaVencimiento').valueAsDate = new Date();
+      document.getElementById('fechaCierreReal').valueAsDate = new Date();
+      await cargarDatos();
+    });
+
+    // Control de apertura de Modales
+    function mostrarModal(idModal) {
+      const el = document.getElementById(idModal);
+      if (window.bootstrap && window.bootstrap.Modal) {
+        let instance = bootstrap.Modal.getInstance(el);
+        if (!instance) {
+          instance = new bootstrap.Modal(el);
+        }
+        instance.show();
+      } else {
+        el.classList.add('show');
+        el.style.display = 'block';
+        el.removeAttribute('aria-hidden');
+      }
+    }
+
+    function cerrarModal(idModal) {
+      const el = document.getElementById(idModal);
+      if (window.bootstrap && window.bootstrap.Modal) {
+        const instance = bootstrap.Modal.getInstance(el);
+        if (instance) instance.hide();
+      } else {
+        el.classList.remove('show');
+        el.style.display = 'none';
+        el.setAttribute('aria-hidden', 'true');
+      }
+    }
+
+    function abrirModalNuevaTarea() {
+      document.getElementById('formNuevaTarea').reset();
+      document.getElementById('fechaVencimiento').valueAsDate = new Date();
+      mostrarModal('modalNuevaTarea');
+    }
+
+    function abrirModalEquipo() {
+      mostrarModal('modalEquipo');
+    }
+
+    async function cargarDatos() {
+      if (enSharePoint) {
+        try {
+          const response = await fetch(`${_spPageContextInfo.webAbsoluteUrl}/_api/web/lists/getbytitle('${NOMBRE_LISTA_SP}')/items?$top=500`, {
+            headers: { "Accept": "application/json;odata=verbose" }
+          });
+          const data = await response.json();
+          tareas = data.d.results.map(item => ({
+            id: item.ID,
+            titulo: item.Title,
+            descripcion: item.Descripcion || "",
+            responsable: item.Responsable || "Sin asignar",
+            fechaCreacion: item.FechaCreacion ? item.FechaCreacion.split('T')[0] : "",
+            fechaVencimiento: item.FechaVencimiento ? item.FechaVencimiento.split('T')[0] : "",
+            estado: item.Estado || "En Curso",
+            fechaCierre: item.FechaCierre ? item.FechaCierre.split('T')[0] : "",
+            conclusion: item.Conclusion || "",
+            seguimientos: item.Seguimientos ? JSON.parse(item.Seguimientos) : []
+          }));
+        } catch (error) {
+          console.error("Error conectando con SharePoint, usando respaldo local:", error);
+          tareas = JSON.parse(localStorage.getItem('tareas_eje_cafetero')) || [];
+        }
+      } else {
+        tareas = JSON.parse(localStorage.getItem('tareas_eje_cafetero')) || [];
+      }
+      renderEquipo();
+      renderTareas();
+    }
+
+    async function guardarDatosBackend(nuevaTareaObj, idActualizar = null, tipoAccion = 'crear') {
+      if (enSharePoint) {
+        try {
+          const digestResp = await fetch(`${_spPageContextInfo.webAbsoluteUrl}/_api/contextinfo`, {
+            method: "POST",
+            headers: { "Accept": "application/json;odata=verbose" }
+          });
+          const digestData = await digestResp.json();
+          const digest = digestData.d.GetContextWebInformation.FormDigestValue;
+
+          const itemPayload = {
+            '__metadata': { 'type': `SP.Data.${NOMBRE_LISTA_SP}ListItem` },
+            'Title': nuevaTareaObj.titulo,
+            'Descripcion': nuevaTareaObj.descripcion,
+            'Responsable': nuevaTareaObj.responsable,
+            'FechaCreacion': nuevaTareaObj.fechaCreacion,
+            'FechaVencimiento': nuevaTareaObj.fechaVencimiento,
+            'Estado': nuevaTareaObj.estado,
+            'FechaCierre': nuevaTareaObj.fechaCierre || null,
+            'Conclusion': nuevaTareaObj.conclusion,
+            'Seguimientos': JSON.stringify(nuevaTareaObj.seguimientos)
+          };
+
+          if (tipoAccion === 'crear') {
+            await fetch(`${_spPageContextInfo.webAbsoluteUrl}/_api/web/lists/getbytitle('${NOMBRE_LISTA_SP}')/items`, {
+              method: "POST",
+              headers: {
+                "Accept": "application/json;odata=verbose",
+                "Content-Type": "application/json;odata=verbose",
+                "X-RequestDigest": digest
+              },
+              body: JSON.stringify(itemPayload)
+            });
+          } else if (tipoAccion === 'actualizar') {
+            await fetch(`${_spPageContextInfo.webAbsoluteUrl}/_api/web/lists/getbytitle('${NOMBRE_LISTA_SP}')/items(${idActualizar})`, {
+              method: "POST",
+              headers: {
+                "Accept": "application/json;odata=verbose",
+                "Content-Type": "application/json;odata=verbose",
+                "X-RequestDigest": digest,
+                "IF-MATCH": "*",
+                "X-HTTP-Method": "MERGE"
+              },
+              body: JSON.stringify(itemPayload)
+            });
+          } else if (tipoAccion === 'eliminar') {
+            await fetch(`${_spPageContextInfo.webAbsoluteUrl}/_api/web/lists/getbytitle('${NOMBRE_LISTA_SP}')/items(${idActualizar})`, {
+              method: "POST",
+              headers: {
+                "Accept": "application/json;odata=verbose",
+                "X-RequestDigest": digest,
+                "IF-MATCH": "*",
+                "X-HTTP-Method": "DELETE"
+              }
+            });
+          }
+          await cargarDatos();
+        } catch (err) {
+          alert("Error al sincronizar con SharePoint.");
+          console.error(err);
+        }
+      } else {
+        localStorage.setItem('equipo_eje_cafetero', JSON.stringify(equipo));
+        localStorage.setItem('tareas_eje_cafetero', JSON.stringify(tareas));
+        renderTareas();
+      }
+    }
+
+    function renderEquipo() {
+      const select = document.getElementById('selectResponsable');
+      const lista = document.getElementById('listaEquipo');
+      if(!select || !lista) return;
+
+      select.innerHTML = '';
+      lista.innerHTML = '';
+
+      equipo.forEach((miembro, index) => {
+        select.innerHTML += `<option value="${miembro}">${miembro}</option>`;
+        lista.innerHTML += `
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            ${miembro}
+            ${equipo.length > 1 ? `<button class="btn btn-sm btn-outline-danger" onclick="eliminarMiembro(${index})"><i class="fa-solid fa-trash"></i></button>` : ''}
+          </li>`;
+      });
+    }
+
+    function agregarMiembro() {
+      const input = document.getElementById('nuevoMiembro');
+      const nombre = input.value.trim();
+      if(nombre && !equipo.includes(nombre)) {
+        equipo.push(nombre);
+        input.value = '';
+        if(!enSharePoint) {
+          localStorage.setItem('equipo_eje_cafetero', JSON.stringify(equipo));
+        }
+        renderEquipo();
+        renderTareas();
+      }
+    }
+
+    function eliminarMiembro(index) {
+      equipo.splice(index, 1);
+      if(!enSharePoint) {
+        localStorage.setItem('equipo_eje_cafetero', JSON.stringify(equipo));
+      }
+      renderEquipo();
+      renderTareas();
+    }
+
+    document.getElementById('formNuevaTarea').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const hoy = new Date().toISOString().split('T')[0];
+      const nuevaTarea = {
+        id: Date.now(),
+        titulo: document.getElementById('tituloTarea').value,
+        descripcion: document.getElementById('descripcionTarea').value,
+        responsable: document.getElementById('selectResponsable').value,
+        fechaCreacion: hoy,
+        fechaVencimiento: document.getElementById('fechaVencimiento').value,
+        estado: 'En Curso',
+        fechaCierre: '',
+        conclusion: '',
+        seguimientos: []
+      };
+
+      if (!enSharePoint) {
+        tareas.push(nuevaTarea);
+      }
+      
+      await guardarDatosBackend(nuevaTarea, null, 'crear');
+      cerrarModal('modalNuevaTarea');
+    });
+
+    function renderTareas() {
+      const tbody = document.getElementById('tbodyTareas');
+      if(!tbody) return;
+      tbody.innerHTML = '';
+
+      const hoy = new Date().toISOString().split('T')[0];
+
+      let totalCerradas = 0;
+      let totalCumplen = 0;
+      let totalEnCurso = 0;
+
+      let kpiUser = {};
+      equipo.forEach(m => kpiUser[m] = { asignadas: 0, cerradas: 0, cumplen: 0 });
+
+      tareas.forEach(tarea => {
+        if(kpiUser[tarea.responsable]) {
+          kpiUser[tarea.responsable].asignadas++;
+        }
+
+        let badgeCumplimiento = '';
+        let diasDisplay = '';
+
+        if(tarea.estado === 'Cerrada') {
+          totalCerradas++;
+          if(kpiUser[tarea.responsable]) kpiUser[tarea.responsable].cerradas++;
+
+          if(tarea.fechaCierre <= tarea.fechaVencimiento) {
+            totalCumplen++;
+            if(kpiUser[tarea.responsable]) kpiUser[tarea.responsable].cumplen++;
+            badgeCumplimiento = '<span class="badge badge-cumple"><i class="fa-solid fa-check me-1"></i>Cumple</span>';
+          } else {
+            badgeCumplimiento = '<span class="badge badge-nocumple"><i class="fa-solid fa-xmark me-1"></i>No Cumple</span>';
+          }
+          diasDisplay = `<small class="text-muted">Cerrada el ${tarea.fechaCierre}</small>`;
+        } else {
+          totalEnCurso++;
+          badgeCumplimiento = '<span class="badge badge-encurso">En Curso</span>';
+          
+          const diffTime = new Date(tarea.fechaVencimiento) - new Date(hoy);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          if(diffDays < 0) {
+            diasDisplay = `<span class="text-danger fw-bold"><i class="fa-solid fa-triangle-exclamation"></i> Vencida por ${Math.abs(diffDays)} días</span>`;
+          } else if(diffDays === 0) {
+            diasDisplay = `<span class="text-warning fw-bold">Vence Hoy</span>`;
+          } else {
+            diasDisplay = `<span class="text-success fw-bold">${diffDays} días restantes</span>`;
+          }
+        }
+
+        let descCorta = tarea.descripcion ? (tarea.descripcion.length > 50 ? tarea.descripcion.substring(0, 50) + '...' : tarea.descripcion) : '';
+
+        tbody.innerHTML += `
+          <tr>
+            <td>
+              <div class="fw-bold text-primary" style="cursor:pointer;" onclick="abrirDetalleCompleto(${tarea.id})">${tarea.titulo}</div>
+              ${descCorta ? `<small class="text-muted d-block">${descCorta}</small>` : ''}
+              ${tarea.conclusion ? `<small class="text-muted d-block"><b>Conclusión:</b> ${tarea.conclusion}</small>` : ''}
+            </td>
+            <td>${tarea.responsable}</td>
+            <td><small class="text-muted">${tarea.fechaCreacion}</small></td>
+            <td><small class="fw-bold">${tarea.fechaVencimiento}</small></td>
+            <td>${tarea.estado === 'Cerrada' ? `<span class="text-success fw-bold">Cerrada</span>` : '<span class="text-primary fw-bold">Pendiente</span>'}</td>
+            <td>${diasDisplay}</td>
+            <td>${badgeCumplimiento}</td>
+            <td class="text-end">
+              <button class="btn btn-sm btn-outline-secondary me-1" onclick="abrirDetalleCompleto(${tarea.id})" title="Ver Detalle"><i class="fa-solid fa-eye"></i></button>
+              <button class="btn btn-sm btn-outline-info me-1" onclick="abrirSeguimiento(${tarea.id})" title="Seguimientos"><i class="fa-solid fa-comments"></i> (${tarea.seguimientos ? tarea.seguimientos.length : 0})</button>
+              ${tarea.estado !== 'Cerrada' ? `<button class="btn btn-sm btn-outline-success" onclick="abrirCierre(${tarea.id})"><i class="fa-solid fa-check-double"></i> Cerrar</button>` : ''}
+              <button class="btn btn-sm btn-outline-danger ms-1" onclick="eliminarTarea(${tarea.id})"><i class="fa-solid fa-trash"></i></button>
+            </td>
+          </tr>`;
+      });
+
+      document.getElementById('kpiTotal').innerText = tareas.length;
+      document.getElementById('kpiCerradas').innerText = totalCerradas;
+      document.getElementById('kpiEnCurso').innerText = totalEnCurso;
+      
+      const pctGeneral = totalCerradas > 0 ? Math.round((totalCumplen / totalCerradas) * 100) : 0;
+      document.getElementById('kpiCumplimiento').innerText = `${pctGeneral}%`;
+
+      const contenedorEquipo = document.getElementById('contenedorEquipoKPI');
+      contenedorEquipo.innerHTML = '';
+      equipo.forEach((m, idx) => {
+        const stats = kpiUser[m] || { asignadas: 0, cerradas: 0, cumplen: 0 };
+        const pct = stats.cerradas > 0 ? Math.round((stats.cumplen / stats.cerradas) * 100) : 0;
+
+        contenedorEquipo.innerHTML += `
+          <div class="col-md-4 col-sm-6">
+            <div class="p-2 border rounded bg-light">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-dark small">${m}</span>
+                <button class="btn btn-xs btn-outline-success py-0 px-1" style="font-size:11px;" onclick="exportarEvolutivoPorIndice(${idx})"><i class="fa-solid fa-file-excel me-1"></i>Evolutivo</button>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mt-1">
+                <small class="text-muted">Asignadas: ${stats.asignadas} | Cerradas: ${stats.cerradas}</small>
+                <span class="badge ${pct >= 80 ? 'bg-success' : (pct >= 50 ? 'bg-warning text-dark' : 'bg-danger')}">${pct}% Cumplimiento</span>
+              </div>
+            </div>
+          </div>`;
+      });
+    }
+
+    function abrirDetalleCompleto(id) {
+      const t = tareas.find(item => item.id == id);
+      if(!t) return;
+
+      document.getElementById('verTituloTarea').innerText = t.titulo;
+      document.getElementById('verDescripcionText').innerText = t.descripcion || 'Sin descripción detallada.';
+      document.getElementById('verResponsable').innerText = t.responsable;
+      document.getElementById('verFechaCreacion').innerText = t.fechaCreacion;
+      document.getElementById('verFechaVencimiento').innerText = t.fechaVencimiento;
+      document.getElementById('verEstado').innerText = t.estado;
+
+      if(t.estado === 'Cerrada') {
+        document.getElementById('verSeccionConclusion').classList.remove('d-none');
+        document.getElementById('verConclusionText').innerText = t.conclusion || 'Sin conclusión.';
+      } else {
+        document.getElementById('verSeccionConclusion').classList.add('d-none');
+      }
+
+      const contenedor = document.getElementById('verListaSeguimientos');
+      contenedor.innerHTML = '';
+      if(t.seguimientos && t.seguimientos.length > 0) {
+        t.seguimientos.forEach(s => {
+          contenedor.innerHTML += `
+            <div class="p-2 border rounded bg-white">
+              <small class="text-muted d-block fw-bold">${s.fecha}</small>
+              <span>${s.texto}</span>
+            </div>`;
+        });
+      } else {
+        contenedor.innerHTML = '<span class="text-muted small">Sin seguimientos.</span>';
+      }
+
+      mostrarModal('modalVerDetalle');
+    }
+
+    function exportarEvolutivoPorIndice(idx) {
+      const resp = equipo[idx];
+      const filtradas = tareas.filter(t => t.responsable === resp);
+
+      if(filtradas.length === 0) {
+        alert(`No hay tareas asignadas para ${resp}`);
+        return;
+      }
+
+      let data = [];
+      filtradas.forEach(t => {
+        if(t.seguimientos && t.seguimientos.length > 0) {
+          t.seguimientos.forEach((s, i) => {
+            data.push({
+              "Responsable": t.responsable,
+              "Tarea": t.titulo,
+              "Descripción": t.descripcion || "N/A",
+              "Estado": t.estado,
+              "Creación": t.fechaCreacion,
+              "Vencimiento": t.fechaVencimiento,
+              "Seguimiento #": i + 1,
+              "Fecha Seguimiento": s.fecha,
+              "Detalle Avance": s.texto,
+              "Conclusión Cierre": t.conclusion || "En Progreso"
+            });
+          });
+        } else {
+          data.push({
+            "Responsable": t.responsable,
+            "Tarea": t.titulo,
+            "Descripción": t.descripcion || "N/A",
+            "Estado": t.estado,
+            "Creación": t.fechaCreacion,
+            "Vencimiento": t.fechaVencimiento,
+            "Seguimiento #": 0,
+            "Fecha Seguimiento": "Sin avances",
+            "Detalle Avance": "Tarea sin seguimientos",
+            "Conclusión Cierre": t.conclusion || "En Progreso"
+          });
+        }
+      });
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Evolutivo");
+      XLSX.writeFile(wb, `Evolutivo_${resp.replace(/\s+/g, '_')}.xlsx`);
+    }
+
+    function abrirCierre(id) {
+      document.getElementById('idTareaCierre').value = id;
+      document.getElementById('conclusionCierre').value = '';
+      document.getElementById('fechaCierreReal').valueAsDate = new Date();
+      mostrarModal('modalCerrarTarea');
+    }
+
+    async function guardarCierreTarea() {
+      const id = document.getElementById('idTareaCierre').value;
+      const conclusion = document.getElementById('conclusionCierre').value.trim();
+      const fechaCierre = document.getElementById('fechaCierreReal').value;
+
+      if(!conclusion) {
+        alert("La conclusión de cierre es OBLIGATORIA para finalizar la tarea.");
+        return;
+      }
+
+      const t = tareas.find(item => item.id == id);
+      if(t) {
+        t.estado = 'Cerrada';
+        t.fechaCierre = fechaCierre;
+        t.conclusion = conclusion;
+        
+        if (!enSharePoint) {
+          localStorage.setItem('tareas_eje_cafetero', JSON.stringify(tareas));
+          renderTareas();
+        }
+        
+        await guardarDatosBackend(t, id, 'actualizar');
+        cerrarModal('modalCerrarTarea');
+      }
+    }
+
+    function abrirSeguimiento(id) {
+      document.getElementById('idTareaSeguimiento').value = id;
+      renderSeguimientosList(id);
+      mostrarModal('modalSeguimiento');
+    }
+
+    async function agregarSeguimiento() {
+      const id = document.getElementById('idTareaSeguimiento').value;
+      const texto = document.getElementById('textoSeguimiento').value.trim();
+      if(!texto) return;
+
+      const t = tareas.find(item => item.id == id);
+      if(t) {
+        if(!t.seguimientos) t.seguimientos = [];
+        const fecha = new Date().toLocaleString();
+        t.seguimientos.push({ fecha, texto });
+        document.getElementById('textoSeguimiento').value = '';
+        
+        if (!enSharePoint) {
+          localStorage.setItem('tareas_eje_cafetero', JSON.stringify(tareas));
+          renderTareas();
+        }
+
+        await guardarDatosBackend(t, id, 'actualizar');
+        renderSeguimientosList(id);
+      }
+    }
+
+    function renderSeguimientosList(id) {
+      const t = tareas.find(item => item.id == id);
+      const contenedor = document.getElementById('historialSeguimientos');
+      if(!contenedor) return;
+      contenedor.innerHTML = '';
+
+      if(t && t.seguimientos && t.seguimientos.length > 0) {
+        t.seguimientos.forEach(s => {
+          contenedor.innerHTML += `
+            <div class="p-2 border rounded bg-light">
+              <small class="text-muted d-block fw-bold">${s.fecha}</small>
+              <span>${s.texto}</span>
+            </div>`;
+        });
+      } else {
+        contenedor.innerHTML = '<span class="text-muted small">No hay seguimientos registrados.</span>';
+      }
+    }
+
+    async function eliminarTarea(id) {
+      if(confirm("¿Seguro de eliminar esta tarea?")) {
+        if (!enSharePoint) {
+          tareas = tareas.filter(t => t.id != id);
+          localStorage.setItem('tareas_eje_cafetero', JSON.stringify(tareas));
+          renderTareas();
+        }
+        await guardarDatosBackend(null, id, 'eliminar');
+      }
+    }
+
+    function exportarExcel() {
+      const data = tareas.map(t => ({
+        "Título Tarea": t.titulo,
+        "Descripción Detallada": t.descripcion || "N/A",
+        "Responsable": t.responsable,
+        "Fecha Creación": t.fechaCreacion,
+        "Fecha Vencimiento": t.fechaVencimiento,
+        "Estado": t.estado,
+        "Fecha Cierre": t.fechaCierre || "N/A",
+        "Conclusión Cierre": t.conclusion || "N/A",
+        "Cumplimiento": t.estado === 'Cerrada' ? (t.fechaCierre <= t.fechaVencimiento ? "Cumple" : "No Cumple") : "En Curso"
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Tareas");
+      XLSX.writeFile(wb, "GESTOR_REGIONAL_EJE_CAFETERO.xlsx");
+    }
+
+    function exportarPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      doc.setFontSize(16);
+      doc.text("GESTOR REGIONAL EJE CAFETERO - Reporte de Tareas", 14, 15);
+      
+      const rows = tareas.map(t => [
+        t.titulo,
+        t.responsable,
+        t.fechaCreacion,
+        t.fechaVencimiento,
+        t.estado,
+        t.estado === 'Cerrada' ? (t.fechaCierre <= t.fechaVencimiento ? "Cumple" : "No Cumple") : "En Curso"
+      ]);
+
+      doc.autoTable({
+        head: [['Tarea', 'Responsable', 'Creación', 'Vencimiento', 'Estado', 'Indicador']],
+        body: rows,
+        startY: 25,
+      });
+
+      doc.save("GESTOR_REGIONAL_EJE_CAFETERO.pdf");
+    }
+  </script>
+</body>
+</html>
+```eof
+
+### Cambios realizados:
+1. **Importación de JS:** Se reubicó e incluyó la etiqueta `<script src="...bootstrap.bundle.min.js">` antes del código ejecutable.
+2. **Manejo de Modales Robusto:** Se centralizaron las aperturas y cierres en las funciones `mostrarModal()` y `cerrarModal()`, permitiendo que abra el formulario de "Nueva Tarea" tanto si Bootstrap JS se carga correctamente como si hay un retraso en la carga remota de bibliotecas CDN.
